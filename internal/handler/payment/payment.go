@@ -23,22 +23,23 @@ func NewPaymentHandler(g *echo.Group, uc domain.PaymentService) {
 func (h *PaymentHandler) CreatePayment(c echo.Context) error {
 	var pr domain.PaymentRequest
 	if err := c.Bind(&pr); err != nil {
-		return domain.Error{
-			Code:        http.StatusBadRequest,
-			Message:     "invalid request body",
-			Description: "failed to bind request body",
-			Err:         err,
-		}
+		return domain.NewError(
+			http.StatusBadRequest,
+			"invalid request body",
+			"failed to bind request body",
+			err,
+			nil,
+		)
 	}
 
 	if err := pr.Validate(); err != nil {
-		return domain.Error{
-			Code:        http.StatusBadRequest,
-			Message:     "validation failed",
-			Description: "payment request validation failed",
-			Args:        map[string]interface{}{"req": pr},
-			Err:         err,
-		}
+		return domain.NewError(
+			http.StatusBadRequest,
+			"validation failed",
+			"payment request validation failed",
+			err,
+			map[string]interface{}{"req": pr},
+		)
 	}
 
 	res, err := h.svc.CreatePayment(c.Request().Context(), &pr)
@@ -55,16 +56,5 @@ func (h *PaymentHandler) GetPaymentByID(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-
-	if res == nil {
-		return domain.Error{
-			Code:        http.StatusNotFound,
-			Message:     "payment not found",
-			Description: "payment not found",
-			Args:        map[string]interface{}{"id": id},
-			Err:         nil,
-		}
-	}
-
 	return c.JSON(http.StatusOK, res)
 }

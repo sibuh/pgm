@@ -33,22 +33,20 @@ func (u *PaymentService) CreatePayment(ctx context.Context, p *domain.PaymentReq
 	exists, err := u.queries.CheckExistence(ctx, p.Reference)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.Error{
-				Code:        500,
-				Message:     "Failed to check for existing payment",
-				Description: err.Error(),
-				Err:         err,
-			}
+			return nil, domain.NewError(
+				500,
+				"Failed to check for existing payment",
+				"An unexpected error occurred while checking for existing payment", err, nil)
 		}
 	}
 	if exists {
-		return nil, domain.Error{
-			Code:        409,
-			Message:     "Payment with this reference already exists",
-			Description: "A payment with the same reference has already been created",
-			Err:         fmt.Errorf("payment with reference %s already exists", p.Reference),
-			Args:        map[string]interface{}{"reference": p.Reference},
-		}
+		return nil, domain.NewError(
+			409,
+			"Payment with this reference already exists",
+			"A payment with the same reference has already been created",
+			fmt.Errorf("payment with reference %s already exists", p.Reference),
+			map[string]interface{}{"reference": p.Reference},
+		)
 	}
 
 	payment, err := u.queries.CreatePayment(ctx, db.CreatePaymentParams{
@@ -57,12 +55,13 @@ func (u *PaymentService) CreatePayment(ctx context.Context, p *domain.PaymentReq
 		Reference: p.Reference,
 	})
 	if err != nil {
-		return nil, domain.Error{
-			Code:        500,
-			Message:     "Failed to create payment",
-			Description: err.Error(),
-			Err:         err,
-		}
+		return nil, domain.NewError(
+			500,
+			"Failed to create payment",
+			err.Error(),
+			err,
+			nil,
+		)
 	}
 
 	// Publish to RabbitMQ
@@ -88,22 +87,24 @@ func (u *PaymentService) GetPaymentByID(ctx context.Context, id string) (*domain
 	// parse payment id
 	paymentID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, domain.Error{
-			Code:        400,
-			Message:     "Invalid payment ID format",
-			Description: "The provided payment ID is not a valid UUID format",
-			Err:         err,
-		}
+		return nil, domain.NewError(
+			400,
+			"Invalid payment ID format",
+			"The provided payment ID is not a valid UUID format",
+			err,
+			nil,
+		)
 	}
 
 	payment, err := u.queries.GetPaymentByID(ctx, paymentID)
 	if err != nil {
-		return nil, domain.Error{
-			Code:        500,
-			Message:     "Failed to fetch payment",
-			Description: "Error occurred while retrieving payment information",
-			Err:         err,
-		}
+		return nil, domain.NewError(
+			500,
+			"Failed to fetch payment",
+			"Error occurred while retrieving payment information",
+			err,
+			nil,
+		)
 	}
 
 	return &domain.Payment{
@@ -121,36 +122,46 @@ func (u *PaymentService) ProcessPayment(ctx context.Context, id string) error {
 	// Parse payment id
 	paymentID, err := uuid.Parse(id)
 	if err != nil {
-		return domain.Error{
-			Code:        400,
-			Message:     "Invalid payment ID format",
-			Description: "The provided payment ID is not a valid UUID format",
-			Err:         err,
-		}
+		return domain.NewError(
+			400,
+			"Invalid payment ID format",
+			"The provided payment ID is not a valid UUID format",
+			err,
+			nil,
+		)
 	}
 
 	// Use row-level locking to prevent race conditions
 	p, err := u.queries.GetPaymentByIDWithLock(ctx, paymentID)
 	if err != nil {
-		return domain.Error{
-			Code:        500,
-			Message:     "Failed to fetch payment",
-			Description: "Error occurred while retrieving payment information",
-			Err:         err,
-		}
+		return domain.NewError(
+			500,
+			"Failed to fetch payment",
+			"Error occurred while retrieving payment information",
+			err,
+			nil,
+		)
 	}
 	if p.ID == uuid.Nil {
-		return domain.Error{
-			Code:        404,
-			Message:     "Payment not found",
-			Description: "The specified payment could not be found",
-		}
+		return domain.NewError(
+			404,
+			"Payment not found",
+			"The specified payment could not be found",
+			nil,
+			nil,
+		)
 	}
 
 	// Idempotency check: only process if PENDING
 	if string(p.Status) != string(domain.StatusPending) {
 		fmt.Printf("payment %s already processed with status %s\n", id, p.Status)
-		return nil
+		return domain.NewError(
+			409,
+			"Payment already processed",
+			"This payment has already been processed with status "+string(p.Status),
+			nil,
+			map[string]interface{}{"status": p.Status},
+		)
 	}
 
 	// Simulate processing
@@ -166,12 +177,13 @@ func (u *PaymentService) ProcessPayment(ctx context.Context, id string) error {
 		Status: db.Paymentstatus(newStatus),
 	})
 	if err != nil {
-		return domain.Error{
-			Code:        500,
-			Message:     "Failed to update payment status",
-			Description: "Error occurred while updating payment status in the database",
-			Err:         err,
-		}
+		return domain.NewError(
+			500,
+			"Failed to update payment status",
+			"Error occurred while updating payment status in the database",
+			err,
+			nil,
+		)
 	}
 
 	fmt.Printf("payment %s processed with status %s\n", id, newStatus)
