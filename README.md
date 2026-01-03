@@ -7,7 +7,8 @@
 - Input validation and error handling
 - Retry mechanism for failed operations
 - Containerized with Docker
-- Comprehensive test coverage
+- Comprehensive unit test for handlers
+- swagger documentation for apis
 
 ## 🚀 Prerequisites
 
