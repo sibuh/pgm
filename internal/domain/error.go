@@ -38,7 +38,11 @@ func NewError(code int, message string, description string, err error, args map[
 }
 
 func (e Error) Error() string {
-	return fmt.Sprintf("Message:%d: Description:%s Cause:%s", e.Code, e.Message, e.Err.Error())
+	cause := "nil"
+	if e.Err != nil {
+		cause = e.Err.Error()
+	}
+	return fmt.Sprintf("Code:%d: Message:%s Description:%s Cause:%s", e.Code, e.Message, e.Description, cause)
 }
 
 func (e Error) ErrorCode() int {

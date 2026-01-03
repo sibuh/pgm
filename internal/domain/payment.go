@@ -6,6 +6,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 )
 
 type PaymentStatus string
@@ -33,7 +34,7 @@ type PaymentRequest struct {
 
 func (pr PaymentRequest) Validate() error {
 	return validation.ValidateStruct(&pr,
-		validation.Field(&pr.Amount, validation.Required.Error("payment amount is required"), validation.Min(0.01)),
+		validation.Field(&pr.Amount, validation.Required.Error("payment amount is required"), validation.Min(0.0).Error("payment amount must be greater than 0.0")),
 		validation.Field(&pr.Currency, validation.Required.Error("currency is required"), validation.In("ETB", "USD")),
 		validation.Field(&pr.Reference, validation.Required.Error("payment reference is required")))
 }
@@ -52,7 +53,10 @@ type PaymentService interface {
 	GetPaymentByID(ctx context.Context, id string) (*Payment, error)
 	ProcessPayment(ctx context.Context, id string) error
 }
-
+type PaymentHandler interface {
+	CreatePayment(c echo.Context) error
+	GetPaymentByID(c echo.Context) error
+}
 type MessagePublisher interface {
 	PublishPaymentCreated(ctx context.Context, paymentID string) error
 }

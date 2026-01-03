@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"time"
 
 	"pgm/internal/domain"
@@ -16,11 +17,11 @@ import (
 )
 
 type PaymentService struct {
-	queries   *db.Queries
+	queries   db.Querier
 	publisher domain.MessagePublisher
 }
 
-func NewPaymentService(q *db.Queries, publisher domain.MessagePublisher) domain.PaymentService {
+func NewPaymentService(q db.Querier, publisher domain.MessagePublisher) domain.PaymentService {
 	return &PaymentService{
 		queries:   q,
 		publisher: publisher,
@@ -28,6 +29,16 @@ func NewPaymentService(q *db.Queries, publisher domain.MessagePublisher) domain.
 }
 
 func (u *PaymentService) CreatePayment(ctx context.Context, p *domain.PaymentRequest) (*domain.Payment, error) {
+	// validate request
+	if err := p.Validate(); err != nil {
+		return nil, domain.NewError(
+			http.StatusBadRequest,
+			"validation failed",
+			"payment request validation failed",
+			err,	
+			map[string]interface{}{"req": p},
+		)
+	}
 	// Check if reference already exists
 
 	exists, err := u.queries.CheckExistence(ctx, p.Reference)

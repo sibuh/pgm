@@ -9,54 +9,18 @@ import (
 )
 
 // PaymentHandler handles HTTP requests for payments
-type PaymentHandler struct {
+type paymentHandler struct {
 	svc domain.PaymentService
 }
 
-// NewPaymentHandler creates a new payment handler with the given service
-// @Summary Initialize payment routes
-// @Description Sets up the payment routes with their respective handlers
-// @Tags payments
-// @Accept json
-// @Produce json
-// @Router /v1/payments [post]
-// @Router /v1/payments/{id} [get]
-
-// CreatePaymentRequest represents the request body for creating a payment
-// swagger:parameters createPayment
-type CreatePaymentRequest struct {
-	// Payment details
-	// in: body
-	// required: true
-	Body domain.PaymentRequest `json:"body"`
-}
-
-// PaymentResponse represents a payment response
-// swagger:response paymentResponse
-type PaymentResponse struct {
-	// in: body
-	Body domain.Payment
-}
-
-// ErrorResponse represents an error response
-// swagger:response errorResponse
-type ErrorResponse struct {
-	// in: body
-	Body struct {
-		Code        int         `json:"code"`
-		Message     string      `json:"message"`
-		Description string      `json:"description,omitempty"`
-		Params      interface{} `json:"params,omitempty"`
-	}
-}
-
 // NewPaymentHandler initializes the payment routes
-func NewPaymentHandler(g *echo.Group, uc domain.PaymentService) {
-	handler := &PaymentHandler{
+func NewPaymentHandler(g *echo.Group, uc domain.PaymentService) domain.PaymentHandler {
+	handler := &paymentHandler{
 		svc: uc,
 	}
 	g.POST("/payments", handler.CreatePayment)
 	g.GET("/payments/:id", handler.GetPaymentByID)
+	return handler
 }
 
 // CreatePayment handles the creation of a new payment
@@ -71,7 +35,7 @@ func NewPaymentHandler(g *echo.Group, uc domain.PaymentService) {
 // @Failure 409 {object} ErrorResponse "Payment with this reference already exists"
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/payments [post]
-func (h *PaymentHandler) CreatePayment(c echo.Context) error {
+func (h *paymentHandler) CreatePayment(c echo.Context) error {
 	var pr domain.PaymentRequest
 	if err := c.Bind(&pr); err != nil {
 		return domain.NewError(
@@ -80,16 +44,6 @@ func (h *PaymentHandler) CreatePayment(c echo.Context) error {
 			"failed to bind request body",
 			err,
 			nil,
-		)
-	}
-
-	if err := pr.Validate(); err != nil {
-		return domain.NewError(
-			http.StatusBadRequest,
-			"validation failed",
-			"payment request validation failed",
-			err,
-			map[string]interface{}{"req": pr},
 		)
 	}
 
@@ -112,7 +66,7 @@ func (h *PaymentHandler) CreatePayment(c echo.Context) error {
 // @Failure 404 {object} ErrorResponse "Payment not found"
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/payments/{id} [get]
-func (h *PaymentHandler) GetPaymentByID(c echo.Context) error {
+func (h *paymentHandler) GetPaymentByID(c echo.Context) error {
 	id := c.Param("id")
 	res, err := h.svc.GetPaymentByID(c.Request().Context(), id)
 	if err != nil {
